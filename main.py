@@ -5,12 +5,14 @@ import pytesseract
 import sched, time # Import schedule and time to run every 30 seconds and check if text is on the screen
 import webbrowser # Used to open the webrowser and see the information of the player that eliminated you
 from screeninfo import get_monitors
-for m in get_monitors():
-    print(str(m))
 
 # (Optional) Set the Tesseract path if it's not in the system PATH
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
+# This function will return the values of the users monitors, including the resolution of main and other monitors **as well as which is the user's main monitor. 
+## Use it to universally find a) where the main window is and b) where the text will be displayed within that window (probably use percentages) 
+for m in get_monitors():
+    print(str(m))
 
 
 # Function to capture the screen 
