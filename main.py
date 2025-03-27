@@ -40,16 +40,15 @@ def extract_text_from_screen(region):
     return text.strip()
 
 #left value is 1080 for first monitor plus 890 for region
-region = {"top": 1308, "left": 1970, "width": 645, "height": 122}
+# 892 for top?
+region = {"top": 1200, "left": 880, "width": 645, "height": 122}
 previous_text = ""
 
 # Scheduler function that will run every 15 seconds to check if you've been eliminated
 def do_something(scheduler): 
     # schedule the next call first
     scheduler.enter(15, 1, do_something, (scheduler,))
-    # print("Doing stuff...")
-    # then do your stuff
-    # Example usage: Capture and read text in a specific area (x, y, width, height)
+
      
     detected_text: str = extract_text_from_screen(region)
     print("Detected Text:", detected_text)
