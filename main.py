@@ -108,8 +108,14 @@ def capture_screen(regionPara):
 # Function to extract username of the player that brought you to your demise
 def extract_text_from_screen(regionPara1):
     img = capture_screen(regionPara1)
-    text = pytesseract.image_to_string(img)  # Extract text
-    return text.strip()
+    text = pytesseract.image_to_string(img, config='--oem 3 --psm 7')  # Extract text
+    
+    # Clean unwanted characters
+    cleaned_text = text.strip()
+    cleaned_text = cleaned_text.replace(' ', '').replace('~', '')
+
+    return cleaned_text
+    
 
 region = get_region()
 
