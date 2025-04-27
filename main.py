@@ -53,8 +53,8 @@ def get_region():
             top_of_monitor = 0
 
         try:    # Use pyautogui to get the position of the crosshair on the screen. The left edge of the crosshair is ALWAYS the same distance to the right of the right edge of the username text
-            if pyautogui.locateOnScreen(crosshair_image, region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]) , confidence=0.50) is not None:
-                crosshair_location = pyautogui.locateOnScreen(crosshair_image, region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]) , confidence=0.50)
+            if pyautogui.locateOnScreen(crosshair_image, region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]) , confidence=0.75) is not None:
+                crosshair_location = pyautogui.locateOnScreen(crosshair_image, region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]) , confidence=0.75)
 
                 crosshair_percentage_from_right = 100 - ((crosshair_location[0] / mainMonitor["width"]) * 100) # The distance that the crosshair is from the right side of the main monitor will tell us the size of text
                 
@@ -78,14 +78,16 @@ def get_region():
                 
                 # DEBUGGING TOOLS 
                 # print(f"crosshair_percentage_from_right: {crosshair_percentage_from_right}")
-                # print(f"Image found at: {crosshair_location}") 
+                print(f"Image found at: {crosshair_location}") 
                 # im = pyautogui.screenshot('my_screenshot.png', region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]))
                 # print(f"Text width percentage: {text_width}")
                 # print(f"Text width pixels: {text_width}")
-                # im2 = pyautogui.screenshot('generated/my_screenshot_symbol.png', region=(1598, 1222, 89, 87))
+                # im2 = pyautogui.screenshot('generated/my_screenshot_symbol.png', crosshair_location)
                 # print(f"Calculated Region: {regionVar}")
                 
                 return regionVar
+            else:
+                return None
         except pyautogui.ImageNotFoundException: # if the crosshair image isn't found, return without doing anything.
             return
 
@@ -103,7 +105,7 @@ def capture_screen(regionPara):
         
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Convert to grayscale (OCR likes grayscale better)
         gray = cv2.resize(gray, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)  # 4x upscale
-        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY) # Apply threshold to make black and white
+        _, thresh = cv2.threshold(gray, 230, 255, cv2.THRESH_BINARY) # Apply threshold to make black and white ADJUST MIN FROM 230 IF NEEDED
         # cv2.imwrite("generated/processed_username.png", thresh) # Save the processed image of the username screenshot for debugging purposes
         
         return thresh
@@ -228,14 +230,15 @@ previous_text = "" # This variable will hold the name of the player that elimina
 # Loop indefinitely and check if the crosshair icon is on the screen - if it is, then you've been eliminated and we need to do the rest of the stuff that I wrote this program for
 while True:
         region = get_region()
+        # print(f"region: {region}")
         if region is not None:
             detected_text: str = extract_text_from_screen(region)
-            # print("Detected Text:", detected_text)
+            
             # Open a webpage if a username is detected in the chosen area and the username is a new name
             # I understand that this can create a problem if the same player eliminates you twice in a row... If that happens, I'll just uninstall the game and not worry about stats anymore.
             if detected_text != "" and detected_text != previous_text:
                 # webbrowser.open("https://fortnitetracker.com/profile/all/" + detected_text)
-                
+                # print("Detected Text:", detected_text)
                 enemy_hours, enemy_kd = get_player_data(detected_text) # Get the enemy player's stats
                 # player_hours, player_kd = get_player_data(players_username) # Get your stats (Optional)
                 
