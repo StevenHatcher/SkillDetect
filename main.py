@@ -105,17 +105,18 @@ def capture_screen(regionPara):
     with mss.mss() as sct:
         screenshot = sct.grab(regionPara)  # Capture only the specified region
         img = np.array(screenshot)
-        # img = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)  # Convert to grayscale for better OCR
-        # cv2.imwrite("captured_image.png", img)
         
-        # Convert to grayscale (OCR likes grayscale better)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # UNCOMMENT IF YOU NEED TO SEE THE UNPROCESSED USERNAME SCREENSHOT
+        # img = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)  # Convert to grayscale for better OCR
+        # cv2.imwrite("captured/captured_image.png", img)
+        
+        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Convert to grayscale (OCR likes grayscale better)
         gray = cv2.resize(gray, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)  # 4x upscale
-        # Apply threshold to make black and white
-        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY) # Apply threshold to make black and white
 
-        # Save for debugging if needed
-        cv2.imwrite("preprocessed_image.png", thresh)
+        
+        cv2.imwrite("generated/processed_username.png", thresh) # Save the processed image of the username screenshot
         
         return thresh
 
@@ -138,14 +139,13 @@ def get_player_data(username):
     url = f"https://fortnitetracker.com/profile/all/{username}"
 
     chrome_options = Options()
-    # Optional: Run headless if you don't want to see the browser open
-    # chrome_options.add_argument("--headless")
     chrome_options.add_argument("--start-minimized")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # less detection
     
     
 
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options) # Chrome isntance to scrape the data (Can't just use requests - Get status code 403 even with headers)
+    driver.minimize_window() # Can't scrape it in headerless, so just minimize the window when it opens lol
 
     try:
         driver.get(url)
@@ -159,35 +159,8 @@ def get_player_data(username):
 
         # Once fully loaded, get page source
         html = driver.page_source
-        soup = BeautifulSoup(html, "html.parser")
-
-        play_time_element = soup.find("div", class_="trn-card__annotation")
-        if play_time_element:
-            play_time_text = play_time_element.text.strip()
-            print(f"Play Time Element Found: {play_time_text}")  # Debugging line to see what you get
-            time_match = re.search(r"(\d+)h\s+(\d+)m", play_time_text)
-            if time_match:
-                hours = int(time_match.group(1))
-                minutes = int(time_match.group(2))
-                total_hours = hours + (minutes / 60)
-            else:
-                print(f"NO MATCH FOR DAYS/HOURS/MINUTES")
-                total_hours = 0
-        else:
-            print(f"NO PLAYTIME ELEMENT FOUND")
-            total_hours = 0   
-
-
-
-
-
        
-        
-        # Once fully loaded, get page source
-        html = driver.page_source
-
-        # Search for the KD value inside the "all" section of stats
-         # Search for the JSON block that contains the player's stats
+        # Search for the JSON block that contains the player's stats
         profile_json_text = re.search(r'const profile = ({.*?});', html, re.DOTALL)
 
         if not profile_json_text:
@@ -199,21 +172,17 @@ def get_player_data(username):
         profile_data = json.loads(profile_raw)
 
         # Now navigate through the JSON to the "all" section
-        all_stats = profile_data["stats"][0]["stats"]["all"]
-
         kd_ratio = 0
+        kd_ratio = profile_data["stats"][0]["stats"]["all"][2]["value"]
 
-        # Search through the "all" section for K/D value
-        for stat in all_stats:
-            key = stat["metadata"]["key"]
-            if key == "KD":
-                kd_ratio = float(stat["value"])
-                print(f"K/D Value Found: {kd_ratio}")
+        total_hours = 0
+        total_minutes = profile_data["stats"][0]["stats"]["all"][6]["value"]
+        total_hours = round(total_minutes / 60, 2)
 
+        
     except Exception as e:
         print(f"Error: {e}")
         return 0, 0
-
 
     finally:
         driver.quit()
@@ -223,55 +192,79 @@ def get_player_data(username):
 
     return total_hours, kd_ratio
 
+def init_spreadsheet():
+        # Check if the file exists
+        # if not os.path.exists(generated/fortnite_stats.xlsx): # Import OS if you want to use this
+        # Create a new DataFrame with headers and a reserved row for averages
+            df = pd.DataFrame(columns=["K/D", "Playtime"])
+            df.loc[0] = [None, None]  # Row 0 for averages
+            df.to_excel("generated/fortnite_stats.xlsx", index=False)
 
-
-
-
-
-
-
-
-        
-
-        
 # Save to Excel
-def write_to_spreadsheet(e_playtime, e_kd, p_playtime, p_kd):
-    # Initialize DataFrame with column titles
-    columns = ['Player', 'Playtime', 'KD', 'Average playtime of players that eliminate you', 'Average KD of players that eliminate you']
-    df = pd.DataFrame(columns=columns)
-    df.loc[0] = {p_playtime, p_kd, None, None}
-    enemy_row = {e_playtime,e_kd, None, None}
-    new_row = pd.Series(enemy_row, index=df.columns)
-    df = df.append(new_row, ignore_index=True)
+def write_to_spreadsheet(e_playtime, e_kd):#, p_playtime, p_kd):
+    # Load the existing spreadsheet
+    df = pd.read_excel("generated/fortnite_stats.xlsx")
+
+    # Append the new stats
+    new_row = {"K/D": e_kd, "Playtime": e_playtime}
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+    # Save back to Excel
+    df.to_excel("generated/fortnite_stats.xlsx", index=False)
+    print(f"Added: K/D = {e_kd}, Playtime = {e_playtime} hours")
+
+
+def update_averages():
     
+    
+    # if not os.path.exists(filename):
+    #     print("The spreadsheet does not exist yet.")
+    #     return
+
+    # Load spreadsheet
+    df = pd.read_excel("fortnite_stats.xlsx")
+
+    if len(df) <= 2:
+        print("Not enough data to calculate averages yet.")
+        return
+
+    # Calculate averages only from data rows AFTER the reserved average row (starting from index 2)
+    data_rows = df.iloc[2:]
+    
+    avg_kd = data_rows["K/D"].mean()
+    avg_playtime = data_rows["Playtime"].mean()
+
+    # Update the reserved second row (index 1)
+    df.loc[1, "K/D"] = avg_kd
+    df.loc[1, "Playtime"] = avg_playtime
+
+    # Save back to Excel
     df.to_excel("fortnite_stats.xlsx", index=False)
+
+    print(f"Updated Averages: Avg K/D = {avg_kd:.2f}, Avg Playtime = {avg_playtime:.2f} hours")
 
 
 previous_text = ""
-# Scheduler function that will run every 15 seconds to check if you've been eliminated
+# Loop indefinitely and check if the crosshair icon is on the screen - if it is, then you've been eliminated and we need to do the rest of the stuff that I wrote this program for
 while True:
-        # if crosshair_position:
-            region = get_region()
-            if region is not None:
-                detected_text: str = extract_text_from_screen(region)
-                print("Detected Text:", detected_text)
-                # Open a webpage if a username is detected in the chosen area 
-                if detected_text != "" and detected_text != previous_text:
-                    # webbrowser.open("https://fortnitetracker.com/profile/all/" + detected_text)
-                    
-                    # enemy_playtime, enemy_kd = 0, 0
-                    # enemy_playtime, enemy_kd = get_player_data(detected_text)
-                    enemy_hours, enemy_kd = get_player_data(detected_text)
-                    
-                    # player_playtime, player_kd = 0, 0
-                    # player_playtime, player_kd = get_player_data("StillSheisty")
-                    player_hours, player_kd = get_player_data(players_username)
-                    
-                    if enemy_hours != 0 and enemy_kd != 0 and player_hours != 0 and player_kd != 0:
-                        write_to_spreadsheet(enemy_hours, enemy_kd, player_hours, player_kd)
-                    previous_text = detected_text
-            else:
-                time.sleep(1)
+        region = get_region()
+        if region is not None:
+            detected_text: str = extract_text_from_screen(region)
+            print("Detected Text:", detected_text)
+            # Open a webpage if a username is detected in the chosen area and the username is a new name
+            # I understand that this can create a problem if the same player eliminates you twice in a row... If that happens, I'll just uninstall the game and not worry about stats anymore.
+            if detected_text != "" and detected_text != previous_text:
+                # webbrowser.open("https://fortnitetracker.com/profile/all/" + detected_text)
+                
+                enemy_hours, enemy_kd = get_player_data(detected_text) # Get the enemy player's stats
+                # player_hours, player_kd = get_player_data(players_username) # Get your stats (Optional)
+                
+                if enemy_hours != 0 and enemy_kd != 0: #and player_hours != 0 and player_kd != 0:
+                    write_to_spreadsheet(enemy_hours, enemy_kd)#, player_hours, player_kd)
+                    update_averages() # Update the average K/D and Playtime of enemies in the first row.
+                previous_text = detected_text
+        else:
+            time.sleep(1)
 
 
 
