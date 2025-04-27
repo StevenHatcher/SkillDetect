@@ -7,8 +7,6 @@ import pyautogui #Used to find the crosshair icon on the screen.
 from selenium import webdriver # Since the tracker site has protection against bots, we get around this by using selenium instead of requests.
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait # We wait until the page has loaded since the content we are looking for is dynamic
-from selenium.webdriver.support import expected_conditions as EC
 
 import json # Used to get the json data from the tracker website and extract info
 import re
@@ -25,9 +23,9 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 ## Use it to universally find a) where the main window is and b) where the text will be displayed within that window (probably use percentages) 
 
 #create a variable to store the crosshair image
-crosshair_image = 'imgs/caseSpecificCH.png'
+crosshair_image = 'imgs/crosshair_icon.png'
 crosshair_location = None
-players_username = "StillSheisty"
+players_username = "" # Add your username here if you wish to add your own stats to the spreadsheet etc.
 
 
 # This function will return the values of the users monitors, including the resolution of main and other monitors **as well as which is the user's main monitor. 
@@ -204,7 +202,7 @@ def update_averages():
     #     print("The spreadsheet does not exist yet.")
     #     return
     
-    df = pd.read_excel("generated/fortnite_stats.xlsx")# Load spreadsheet
+    df = pd.read_excel("generated/fortnite_stats.xlsx") # Load the spreadsheet
 
     if len(df) <= 2: # If there arent two or more values in the spreadsheet, you cant really take an average lol
         print("Not enough data to calculate averages yet.")
@@ -212,7 +210,6 @@ def update_averages():
 
     # Calculate averages only from data rows AFTER the reserved average row (starting from index 2)
     data_rows = df.iloc[2:]
-    
     avg_kd = data_rows["K/D"].mean()
     avg_playtime = round(data_rows["Playtime"].mean(), 2)
 
@@ -223,14 +220,12 @@ def update_averages():
     # Save back to Excel
     df.to_excel("generated/fortnite_stats.xlsx", index=False)
 
-    # print(f"Updated Averages: Avg K/D = {avg_kd:.2f}, Avg Playtime = {avg_playtime:.2f} hours")
 
 
 previous_text = "" # This variable will hold the name of the player that eliminated you previously.
 # Loop indefinitely and check if the crosshair icon is on the screen - if it is, then you've been eliminated and we need to do the rest of the stuff that I wrote this program for
 while True:
         region = get_region()
-        # print(f"region: {region}")
         if region is not None:
             detected_text: str = extract_text_from_screen(region)
             
