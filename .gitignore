@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 preprocessed_image.png
 *.png
+*.png
