@@ -2,27 +2,21 @@ import mss # import mss for monitor data
 import cv2
 import numpy as np
 import pytesseract # Import pytesseract to use the OCR for scanning the screencapped region for text and saving results in a variable
-import pyautogui
+import pyautogui #Used to find the crosshair icon on the screen.
 
-from selenium import webdriver
+from selenium import webdriver # Since the tracker site has protection against bots, we get around this by using selenium instead of requests.
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait # We wait until the page has loaded since the content we are looking for is dynamic
 from selenium.webdriver.support import expected_conditions as EC
 
-import requests
-import json
-from bs4 import BeautifulSoup
+import json # Used to get the json data from the tracker website and extract info
 import re
 
 import pandas as pd # Import pandas to store the data from the website into a spreadsheet
 
 import sched, time # Import schedule and time to run every 30 seconds and check if text is on the screen
 import webbrowser # Used to open the webrowser and see the information of the player that eliminated you
-# import requests
-
-
-
 
 # (Optional) Set the Tesseract path if it's not in the system PATH
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -48,7 +42,7 @@ def get_region():
         text_height = int(mainMonitor["height"] * 0.088)
         
 
-        # if len(m) > 1:
+        # If the user has more than one monitor, we need to figure out the left and top positions of the main monitor
         if mainMonitor["left"] < relativeMonitor["left"]:
             left_of_monitor = relativeMonitor["left"] - mainMonitor["left"]
         else:
@@ -58,32 +52,21 @@ def get_region():
         else:
             top_of_monitor = 0
 
-        try:
+        try:    # Use pyautogui to get the position of the crosshair on the screen. The left edge of the crosshair is ALWAYS the same distance to the right of the right edge of the username text
             if pyautogui.locateOnScreen(crosshair_image, region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]) , confidence=0.50) is not None:
                 crosshair_location = pyautogui.locateOnScreen(crosshair_image, region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]) , confidence=0.50)
 
-                # print(f"Image found at: {crosshair_location}")
-
-                # The distance that the crosshair is from the right side of the main monitor will tell us the size of text
-                crosshair_percentage_from_right = 100 - ((crosshair_location[0] / mainMonitor["width"]) * 100)
-                # print(f"crosshair_percentage_from_right: {crosshair_percentage_from_right}")
-                # im = pyautogui.screenshot('my_screenshot.png', region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]))
+                crosshair_percentage_from_right = 100 - ((crosshair_location[0] / mainMonitor["width"]) * 100) # The distance that the crosshair is from the right side of the main monitor will tell us the size of text
                 
-                text_width = (-1.89957 * crosshair_percentage_from_right) + 97.61061
-            
-                # print(f"Text width percentage: {text_width}")
-            
-                text_width = (text_width / 100) * mainMonitor["width"] + (0.03 * mainMonitor["width"])
+                
+                text_width = (-1.89957 * crosshair_percentage_from_right) + 97.61061 # Calculate the text width as a PERCENTAGE based on the crosshair's position
+                
+                text_width = (text_width / 100) * mainMonitor["width"] + (0.03 * mainMonitor["width"]) # Calculate the text width in PIXELS based on the crosshair's position (with tolerance)
                 
                 # This one is a doozy but makes sense. This is the horizontal position of the left side of the username text of the player that elimnated you.
                 left_of_text = mainMonitor["width"] - text_width - ((crosshair_percentage_from_right / 100) * mainMonitor["width"]) - (0.006 * mainMonitor["width"]) 
                 
-                # print(f"Text width pixels: {text_width}")
-                
-                # The top of the enemy username text is about 87.25% down from the top of the monitor. Give 0.5% as tolerance.
-                top_of_text = top_of_monitor + (0.874 * mainMonitor["height"] - (0.5 * text_height))
-                
-                # im2 = pyautogui.screenshot('my_screenshot_symbol.png', region=(1598, 1222, 89, 87))
+                top_of_text = top_of_monitor + (0.874 * mainMonitor["height"] - (0.5 * text_height)) # The top of the enemy username text is about 87.25% down from the top of the monitor. Give 0.5% as tolerance.
                 
                 # Adjust region coordinates relative to the main monitor
                 regionVar = {
@@ -92,15 +75,22 @@ def get_region():
                     "width": int(text_width),
                     "height": int(text_height)
                 }
-                print(f"Calculated Region: {regionVar}")
+                
+                # DEBUGGING TOOLS 
+                # print(f"crosshair_percentage_from_right: {crosshair_percentage_from_right}")
+                # print(f"Image found at: {crosshair_location}") 
+                # im = pyautogui.screenshot('my_screenshot.png', region=(left_of_monitor, top_of_monitor, mainMonitor["width"], mainMonitor["height"]))
+                # print(f"Text width percentage: {text_width}")
+                # print(f"Text width pixels: {text_width}")
+                # im2 = pyautogui.screenshot('generated/my_screenshot_symbol.png', region=(1598, 1222, 89, 87))
+                # print(f"Calculated Region: {regionVar}")
+                
                 return regionVar
-        # Use pyautogui to get the position of the crosshair on the screen. The left edge of the crosshair is ALWAYS 46px the right of the right edge of the username text
-        
-        except pyautogui.ImageNotFoundException:
+        except pyautogui.ImageNotFoundException: # if the crosshair image isn't found, return without doing anything.
             return
 
 
-# Function to capture the screen 
+# Function to capture the screen. This function takes a screenshot of the given region (the enemy playert's username), processes it to be more readable for the OCR, then returns it
 def capture_screen(regionPara):
     with mss.mss() as sct:
         screenshot = sct.grab(regionPara)  # Capture only the specified region
@@ -108,79 +98,71 @@ def capture_screen(regionPara):
         
         # UNCOMMENT IF YOU NEED TO SEE THE UNPROCESSED USERNAME SCREENSHOT
         # img = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)  # Convert to grayscale for better OCR
-        # cv2.imwrite("captured/captured_image.png", img)
+        # cv2.imwrite("generated/captured_image.png", img)
         
         
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Convert to grayscale (OCR likes grayscale better)
         gray = cv2.resize(gray, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)  # 4x upscale
         _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY) # Apply threshold to make black and white
-
-        
-        cv2.imwrite("generated/processed_username.png", thresh) # Save the processed image of the username screenshot
+        # cv2.imwrite("generated/processed_username.png", thresh) # Save the processed image of the username screenshot for debugging purposes
         
         return thresh
 
-# Function to extract username of the player that brought you to your demise
+# Function to extract username of the player that brought you to your demise using pytesseract
 def extract_text_from_screen(regionPara1):
-    img = capture_screen(regionPara1)
-    text = pytesseract.image_to_string(img, config='--oem 3 --psm 7')  # Extract text
+    img = capture_screen(regionPara1) # Get processed image of the enemy player's username
+    text = pytesseract.image_to_string(img, config='--oem 3 --psm 7')  # extract the text from the image using pytesseract OCR
     
-    # Clean unwanted characters
-    cleaned_text = text.strip()
-    cleaned_text = cleaned_text.replace(' ', '').replace('~', '')
+
+    cleaned_text = text.strip()     # Clean unwanted characters - This might need some finetuning, 
+    cleaned_text = cleaned_text.replace('', '').replace('~', '') # but I found spaces and ~ to improperly be read the most often
 
     return cleaned_text
     
 
-region = get_region()
+region = get_region() # Generate the needed region of the screen
 
-
+# Function that opens the fortnitetracker.com page of the given username. It opens selenium with chromedriver, minimizes the window since headerless doesn't work here
+# then it returns the user's k/d and playtime in hours
 def get_player_data(username):
-    url = f"https://fortnitetracker.com/profile/all/{username}"
+    url = f"https://fortnitetracker.com/profile/all/{username}" # get the url for the stattracker website
 
     chrome_options = Options()
-    chrome_options.add_argument("--start-minimized")
+    # chrome_options.add_argument("--start-minimized")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # less detection
     
-    
-
     driver = webdriver.Chrome(options=chrome_options) # Chrome isntance to scrape the data (Can't just use requests - Get status code 403 even with headers)
     driver.minimize_window() # Can't scrape it in headerless, so just minimize the window when it opens lol
 
     try:
         driver.get(url)
 
-        # Wait for an element we know is needed (play time area)
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "trn-card__annotation"))
-        )
-
         time.sleep(2)  # optional: extra wait for full JavaScript rendering
 
         # Once fully loaded, get page source
         html = driver.page_source
        
-        # Search for the JSON block that contains the player's stats
+        # Get the section of the json from the page that contains the player's data. It's titled "Profile"
         profile_json_text = re.search(r'const profile = ({.*?});', html, re.DOTALL)
 
-        if not profile_json_text:
+        if not profile_json_text: # if the profile can't be found in the json, print an error and return default 0,0
             print("Could not find profile JSON in page.")
             return 0, 0
 
-        profile_raw = profile_json_text.group(1)
+        profile_raw = profile_json_text.group(1) 
         profile_raw = profile_raw.replace("undefined", "null")  # Fix invalid JS if necessary
         profile_data = json.loads(profile_raw)
 
-        # Now navigate through the JSON to the "all" section
+        # Pull the player's kd ratio and playtime from the json
         kd_ratio = 0
         kd_ratio = profile_data["stats"][0]["stats"]["all"][2]["value"]
 
         total_hours = 0
         total_minutes = profile_data["stats"][0]["stats"]["all"][6]["value"]
-        total_hours = round(total_minutes / 60, 2)
+        total_hours = round(total_minutes / 60, 2) # convert the minutes played to hours and round it to 2 decimal places
 
         
-    except Exception as e:
+    except Exception as e: # throw an error if there's a problem with the webpage
         print(f"Error: {e}")
         return 0, 0
 
@@ -192,6 +174,7 @@ def get_player_data(username):
 
     return total_hours, kd_ratio
 
+#function to initialize the spreadsheet if you don't have a blank one. This expects there to be a clean fortnite_stats.xlsx in generated to work.
 def init_spreadsheet():
         # Check if the file exists
         # if not os.path.exists(generated/fortnite_stats.xlsx): # Import OS if you want to use this
@@ -200,7 +183,7 @@ def init_spreadsheet():
             df.loc[0] = [None, None]  # Row 0 for averages
             df.to_excel("generated/fortnite_stats.xlsx", index=False)
 
-# Save to Excel
+# Write the enemy's kd and playtime to the spreadsheet.
 def write_to_spreadsheet(e_playtime, e_kd):#, p_playtime, p_kd):
     # Load the existing spreadsheet
     df = pd.read_excel("generated/fortnite_stats.xlsx")
@@ -213,18 +196,15 @@ def write_to_spreadsheet(e_playtime, e_kd):#, p_playtime, p_kd):
     df.to_excel("generated/fortnite_stats.xlsx", index=False)
     print(f"Added: K/D = {e_kd}, Playtime = {e_playtime} hours")
 
-
+# function to update the average of the stats of players that have eliminated in the spreadsheet
 def update_averages():
-    
-    
     # if not os.path.exists(filename):
     #     print("The spreadsheet does not exist yet.")
     #     return
+    
+    df = pd.read_excel("generated/fortnite_stats.xlsx")# Load spreadsheet
 
-    # Load spreadsheet
-    df = pd.read_excel("fortnite_stats.xlsx")
-
-    if len(df) <= 2:
+    if len(df) <= 2: # If there arent two or more values in the spreadsheet, you cant really take an average lol
         print("Not enough data to calculate averages yet.")
         return
 
@@ -232,25 +212,25 @@ def update_averages():
     data_rows = df.iloc[2:]
     
     avg_kd = data_rows["K/D"].mean()
-    avg_playtime = data_rows["Playtime"].mean()
+    avg_playtime = round(data_rows["Playtime"].mean(), 2)
 
     # Update the reserved second row (index 1)
     df.loc[1, "K/D"] = avg_kd
     df.loc[1, "Playtime"] = avg_playtime
 
     # Save back to Excel
-    df.to_excel("fortnite_stats.xlsx", index=False)
+    df.to_excel("generated/fortnite_stats.xlsx", index=False)
 
-    print(f"Updated Averages: Avg K/D = {avg_kd:.2f}, Avg Playtime = {avg_playtime:.2f} hours")
+    # print(f"Updated Averages: Avg K/D = {avg_kd:.2f}, Avg Playtime = {avg_playtime:.2f} hours")
 
 
-previous_text = ""
+previous_text = "" # This variable will hold the name of the player that eliminated you previously.
 # Loop indefinitely and check if the crosshair icon is on the screen - if it is, then you've been eliminated and we need to do the rest of the stuff that I wrote this program for
 while True:
         region = get_region()
         if region is not None:
             detected_text: str = extract_text_from_screen(region)
-            print("Detected Text:", detected_text)
+            # print("Detected Text:", detected_text)
             # Open a webpage if a username is detected in the chosen area and the username is a new name
             # I understand that this can create a problem if the same player eliminates you twice in a row... If that happens, I'll just uninstall the game and not worry about stats anymore.
             if detected_text != "" and detected_text != previous_text:
