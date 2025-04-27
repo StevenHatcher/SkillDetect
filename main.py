@@ -3,12 +3,26 @@ import cv2
 import numpy as np
 import pytesseract # Import pytesseract to use the OCR for scanning the screencapped region for text and saving results in a variable
 import pyautogui
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+import requests
+import json
+from bs4 import BeautifulSoup
+import re
+
+import pandas as pd # Import pandas to store the data from the website into a spreadsheet
+
 import sched, time # Import schedule and time to run every 30 seconds and check if text is on the screen
 import webbrowser # Used to open the webrowser and see the information of the player that eliminated you
-import requests
-import re # Import re to help with extracting our K/D from the website
-from bs4 import BeautifulSoup
-import pandas as pd # Import pandas to store the data from the website into a spreadsheet
+# import requests
+
+
+
 
 # (Optional) Set the Tesseract path if it's not in the system PATH
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -19,7 +33,7 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 #create a variable to store the crosshair image
 crosshair_image = 'imgs/caseSpecificCH.png'
 crosshair_location = None
-
+players_username = "StillSheisty"
 
 
 # This function will return the values of the users monitors, including the resolution of main and other monitors **as well as which is the user's main monitor. 
@@ -121,42 +135,104 @@ region = get_region()
 
 
 def get_player_data(username):
-    url = "https://fortnitetracker.com/profile/all/" + username # Get the link for the page
-    headers = {"User-Agent": "Mozilla/5.0"} # Get the content from the page
-    response = requests.get(url, headers=headers)
+    url = f"https://fortnitetracker.com/profile/all/{username}"
+
+    chrome_options = Options()
+    # Optional: Run headless if you don't want to see the browser open
+    # chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--start-minimized")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # less detection
     
-    # Check if the request was successful
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # Extract Play Time (e.g., "225h 57m Play Time")
+    
+
+    driver = webdriver.Chrome(options=chrome_options)
+
+    try:
+        driver.get(url)
+
+        # Wait for an element we know is needed (play time area)
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "trn-card__annotation"))
+        )
+
+        time.sleep(2)  # optional: extra wait for full JavaScript rendering
+
+        # Once fully loaded, get page source
+        html = driver.page_source
+        soup = BeautifulSoup(html, "html.parser")
+
         play_time_element = soup.find("div", class_="trn-card__annotation")
         if play_time_element:
             play_time_text = play_time_element.text.strip()
+            print(f"Play Time Element Found: {play_time_text}")  # Debugging line to see what you get
             time_match = re.search(r"(\d+)h\s+(\d+)m", play_time_text)
             if time_match:
                 hours = int(time_match.group(1))
                 minutes = int(time_match.group(2))
                 total_hours = hours + (minutes / 60)
             else:
-                return
+                print(f"NO MATCH FOR DAYS/HOURS/MINUTES")
+                total_hours = 0
         else:
-            return
+            print(f"NO PLAYTIME ELEMENT FOUND")
+            total_hours = 0   
 
-        # Extract K/D Ratio 
-        kd_element = soup.find(string=re.compile("K/D"))
-        if kd_element:
-            kd_match = re.search(r"(\d+\.\d+)", kd_element)
-            kd_ratio = float(kd_match.group(1)) if kd_match else None
-        else:
-            kd_ratio = None
 
-        # Print results
-        print(f"Total Play Time: {total_hours} hours")
-        print(f"K/D Ratio: {kd_ratio}")
 
-        return total_hours, kd_ratio
+
+
+       
         
+        # Once fully loaded, get page source
+        html = driver.page_source
+
+        # Search for the KD value inside the "all" section of stats
+         # Search for the JSON block that contains the player's stats
+        profile_json_text = re.search(r'const profile = ({.*?});', html, re.DOTALL)
+
+        if not profile_json_text:
+            print("Could not find profile JSON in page.")
+            return 0, 0
+
+        profile_raw = profile_json_text.group(1)
+        profile_raw = profile_raw.replace("undefined", "null")  # Fix invalid JS if necessary
+        profile_data = json.loads(profile_raw)
+
+        # Now navigate through the JSON to the "all" section
+        all_stats = profile_data["stats"][0]["stats"]["all"]
+
+        kd_ratio = 0
+
+        # Search through the "all" section for K/D value
+        for stat in all_stats:
+            key = stat["metadata"]["key"]
+            if key == "KD":
+                kd_ratio = float(stat["value"])
+                print(f"K/D Value Found: {kd_ratio}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return 0, 0
+
+
+    finally:
+        driver.quit()
+
+    print(f"Total Play Time: {total_hours:.2f} hours")
+    print(f"K/D Ratio: {kd_ratio:.2f}")
+
+    return total_hours, kd_ratio
+
+
+
+
+
+
+
+
+
+        
+
         
 # Save to Excel
 def write_to_spreadsheet(e_playtime, e_kd, p_playtime, p_kd):
@@ -185,14 +261,14 @@ while True:
                     
                     # enemy_playtime, enemy_kd = 0, 0
                     # enemy_playtime, enemy_kd = get_player_data(detected_text)
-                    enemy_stats = get_player_data(detected_text)
+                    enemy_hours, enemy_kd = get_player_data(detected_text)
                     
                     # player_playtime, player_kd = 0, 0
                     # player_playtime, player_kd = get_player_data("StillSheisty")
-                    player_stats = get_player_data("StillSheisty")
+                    player_hours, player_kd = get_player_data(players_username)
                     
-                    if enemy_stats[0] != 0 and enemy_stats[1] != 0 and player_stats[0] != 0 and player_stats[1] != 0:
-                        write_to_spreadsheet(enemy_stats[0], enemy_stats[1], player_stats[0], player_stats[1])
+                    if enemy_hours != 0 and enemy_kd != 0 and player_hours != 0 and player_kd != 0:
+                        write_to_spreadsheet(enemy_hours, enemy_kd, player_hours, player_kd)
                     previous_text = detected_text
             else:
                 time.sleep(1)
