@@ -161,3 +161,4 @@ cython_debug/
 preprocessed_image.png
 *.png
 *.png
+captured_image.png
