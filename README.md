@@ -1,4 +1,4 @@
-# SweatDetect
+# SkillDetect
  This program runs in the background while you play Fortnite and collects data about the opponents that eliminate you if their profile is public.
  After a recent update, I found myself struggling every match. I began looking up the profiles of the players that would
  eliminate me and their playtime was often 2000+ hours... wow.
