@@ -10,6 +10,13 @@ top of the spreadsheet.
 
 
 # Installation
+## Preliminaries
+1. Get the latest version of pytesseract OCR
+> https://tesseract-ocr.github.io/tessdoc/
+2. Install the latest version of ChromeDriver
+> https://developer.chrome.com/docs/chromedriver/downloads
+
+## Setup
 1. Clone the repository:
 > git clone https://github.com/StevenHatcher/SkillDetect.git
 2. Install required dependencies
@@ -17,3 +24,9 @@ top of the spreadsheet.
 3. Clone FortniteStats into project:
 > git clone https://github.com/StevenHatcher/FortniteStats.git
 4. Run SkillDetect.py
+
+
+# Functions
+## get_region():
+    This function calculates the region of the user's primary screen if they have multiple monitors, then determines if the crosshair icon is within this space.
+    If it is, then the player has been eliminated 
