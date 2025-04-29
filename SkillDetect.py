@@ -154,7 +154,7 @@ while True:
             enemy_name: str = player_eliminated() # Get the username of the enemy that eliminated you
             # I understand that this can create a problem if the same player eliminates you twice in a row... If that happens, I'll just uninstall the game and not worry about stats anymore lol.
             if enemy_name != "" and enemy_name != previous_text:
-                enemy_data = get_player_data(username=enemy_name, maximize=True) # Get JSON of the enemy player's stats
+                enemy_data = get_player_data(username=enemy_name, maximize=True, auto_close=True) # Get JSON of the enemy player's stats
                 if enemy_data: # If enemy data was successfully acquired, calculate their kd and playtime then write them to the spreadhseet
                     enemy_kd = get_player_stats(enemy_data, gamemode="all", data="KD", option="value") 
                     enemy_hours = round(get_player_stats(enemy_data, gamemode="all", data="MinutesPlayed", option="value") / 60, 2) # Get the player's playtime and convert it to hours
