@@ -7,3 +7,13 @@ This program detects when the crosshair icon (indicating the player has been eli
 of the username of the player that brought you to your demise. The webpage for this player's statistics is opened through chromedriver and the json data
 is used to pull their K/D ratio and playtime. These values are then stored in a .xlsx spreadsheet and the average of the statistics is displayed at the 
 top of the spreadsheet.
+
+
+# Installation
+1. Clone the repository:
+> git clone https://github.com/StevenHatcher/SkillDetect.git
+2. Install required dependencies
+> pip install requirements.txt
+3. Clone FortniteStats into project:
+> git clone https://github.com/StevenHatcher/FortniteStats.git
+4. Run SkillDetect.py
