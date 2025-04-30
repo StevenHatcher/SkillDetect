@@ -64,10 +64,6 @@ def screenshot_playername(region):
     with mss.mss() as sct:
         screenshot = sct.grab(region)  # Capture only the specified region
         img = np.array(screenshot)
-        
-        # UNCOMMENT IF YOU NEED TO SEE THE UNPROCESSED USERNAME SCREENSHOT
-        # cv2.imwrite("generated/unpocessed_username.png", img)
-
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Convert the image to grayscale 
         gray = cv2.resize(gray, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)  # 4x upscale
         _, thresh = cv2.threshold(gray, 230, 255, cv2.THRESH_BINARY) # Apply threshold to make black and white ADJUST MIN FROM 230 IF NEEDED
@@ -106,6 +102,7 @@ def init_spreadsheet(filename="fortnite_stats"):
             df = pd.DataFrame(columns=["K/D", "Playtime"])
             df.loc[0] = [None, None]  # Row 0 for averages
             df.to_excel(f"generated/{filename}.xlsx", index=False)
+            return
 
 # function to update the average of the stats of players that have eliminated in the spreadsheet
 def update_averages(filename="fortnite_stats"):
@@ -127,9 +124,10 @@ def update_averages(filename="fortnite_stats"):
 
     # Save back to Excel
     df.to_excel(f"generated/{filename}.xlsx", index=False)
+    return
 
 # Write the enemy's kd and playtime to the spreadsheet.
-def write_to_spreadsheet(e_playtime, e_kd):#, p_playtime, p_kd):
+def write_to_spreadsheet(e_playtime, e_kd):
     if enemy_hours == 0 and enemy_kd == 0: return
     # Load the existing spreadsheet
     df = pd.read_excel("generated/fortnite_stats.xlsx")
@@ -142,10 +140,12 @@ def write_to_spreadsheet(e_playtime, e_kd):#, p_playtime, p_kd):
     df.to_excel("generated/fortnite_stats.xlsx", index=False)
     print(f"Added: K/D = {e_kd}, Playtime = {e_playtime} hours")
     update_averages() # Update the average K/D and Playtime of enemies in the first row.
+    return
 
 
 # main_screen, left_of_monitor, top_of_monitor = calculate_screen_region() # Get the region of the user's main screen
 previous_text = "" # This variable will hold the name of the player that eliminated you previously.
+init_spreadsheet()
 init_monitor()
 # Loop indefinitely and check if the crosshair icon is on the screen - if it is, then you've been eliminated and we need to do the rest of the stuff that I wrote this program for
 while True:
