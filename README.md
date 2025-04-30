@@ -11,7 +11,7 @@ top of the spreadsheet.
 
 # Installation
 ## Preliminaries
-1. Get the latest version of pytesseract OCR
+1. Get the latest version of Tesseract OCR
 > https://tesseract-ocr.github.io/tessdoc/
 2. Install the latest version of ChromeDriver
 > https://developer.chrome.com/docs/chromedriver/downloads
